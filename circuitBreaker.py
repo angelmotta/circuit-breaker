@@ -20,6 +20,15 @@ class CircuitBreaker:
             self.handleFault()
             raise e
 
+    def halfOpenTryOneCall(self, func):
+        try:
+            result = func()
+            self.reset()
+            return result
+        except Exception as e:
+            self.lastTimeFault = time.time()
+            raise e
+
     def handleFault(self):
         self.faultsCount += 1
         if self.faultsCount >= self.maxFaults:

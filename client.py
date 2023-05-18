@@ -8,7 +8,7 @@ import time
 app = Flask(__name__)
 
 # Create a CircuitBreaker Object
-circuit_breaker = CircuitBreaker(maxFaults=5, waitTimeToReset=10)
+circuit_breaker = CircuitBreaker(maxFaults=5, waitTimeToReset=15)
 
 # Do not remove this method.
 @app.errorhandler(Exception)
@@ -20,15 +20,19 @@ def handle_error(e):
 
 @app.route('/igv')
 def igv():
-    #tax = get_tax_from_api()
+    #tax = get_tax_from_api()       # disable direct call to external API
     # Using circuit_breaker object to call the external API
     resultTax = circuit_breaker.callExternalAPI(get_tax_from_api)
     if resultTax is None:
         print("Circuit is opened")
-        # We can verify resetTimeout value to close the circuit -> so next clients can try again calling the external API
+        # if resetTimeout is reached -> we can try once again calling the external API
         if time.time() - circuit_breaker.lastTimeFault > circuit_breaker.waitTimeToReset:
-            print("Resetting circuit: circuit is closed")
-            circuit_breaker.reset() # next client request can try again calling the external API
+            print("Half-open circuit: try one call to external API")
+            #circuit_breaker.reset() # next client request can try again calling the external API
+            # Call once again -> potential exception if service continues unavailable
+            result = circuit_breaker.halfOpenTryOneCall(get_tax_from_api) 
+            print("Success ReTry tax from External API:", result)
+            return jsonify(igv=result), 200
         return jsonify(error="Disculpe, servicio externo no disponible"), 503
     else:
         print("Result tax from External API:", resultTax)
